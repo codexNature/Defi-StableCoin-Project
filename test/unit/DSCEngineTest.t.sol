@@ -490,6 +490,8 @@ contract DSCEngineTest is StdCheats, Test {
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
     uint256 public constant MIN_HEALTH_FACTOR = 1e18;
     uint256 public constant LIQUIDATION_THRESHOLD = 50;
+    uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant AMOUNT_TO_MINT = 100 ether;
 
     // Liquidation
     address public liquidator = makeAddr("liquidator");
@@ -538,20 +540,20 @@ contract DSCEngineTest is StdCheats, Test {
     // Price Tests //
     //////////////////
 
-    // function testGetTokenAmountFromUsd() public view {
-    //     // If we want $100 of WETH @ $2000/WETH, that would be 0.05 WETH
-    //     uint256 expectedWeth = 0.05 ether;
-    //     uint256 amountWeth = dsce.getTokenAmountFromUsd(weth, 100 ether);
-    //     assertEq(expectedWeth, amountWeth);
-    // }
+    function testGetTokenAmountFromUsd() public view { //i fixed this by adjustung ETH_USD_PRICE to $2000 baing 2000/100 = 0.05 linked to MockV3Aggregator linked to getTokenAmountFromUsd in DSCEngine.
+        // If we want $100 of WETH @ $2000/WETH, that would be 0.05 WETH
+        uint256 expectedWeth = 0.05 ether;
+        uint256 amountWeth = dsce.getTokenAmountFromUsd(weth, 100 ether);
+        assertEq(expectedWeth, amountWeth);
+    }
 
-    // function testGetUsdValue() public view {
-    //     uint256 ethAmount = 15e18;
-    //     // 15e18 ETH * $2000/ETH = $30,000e18
-    //     uint256 expectedUsd = 30_000e18;
-    //     uint256 usdValue = dsce.getUsdValue(weth, ethAmount);
-    //     assertEq(usdValue, expectedUsd);
-    // }
+    function testGetUsdValue() public view {
+        uint256 ethAmount = 15e18;
+        // 15e18 ETH * $2000/ETH = $30,000e18
+        uint256 expectedUsd = 30_000e18;
+        uint256 usdValue = dsce.getUsdValue(weth, ethAmount);
+        assertEq(usdValue, expectedUsd);
+    }
 
     ///////////////////////////////////////
     // depositCollateral Tests //
@@ -657,17 +659,37 @@ contract DSCEngineTest is StdCheats, Test {
     //     tokenAddresses = [weth];
     //     feedAddresses = [ethUsdPriceFeed];
     //     address owner = msg.sender;
-    //     vm.prank(owner);
+    //     vm.prank(USER);
     //     DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
     //     mockDsc.transferOwnership(address(mockDsce));
     //     // Arrange - User
-    //     vm.startPrank(user);
-    //     ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
+    //     vm.startPrank(owner);
+    //     ERC20Mock(weth).approve(address(mockDsce), AMOUNT_COLLATERAL);
 
     //     vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
-    //     mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+    //     mockDsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, amountToMint);
     //     vm.stopPrank();
     // }
+
+    function testRevertsIfMintFails() public {
+        // Arrange - Setup
+        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
+        tokenAddresses = [weth];
+        feedAddresses = [ethUsdPriceFeed];
+        //address owner = msg.sender;
+        vm.prank(user);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
+        vm.prank(mockDsc.owner());
+        mockDsc.transferOwnership(address(mockDsce));
+        // Arrange - User
+        vm.startPrank(user);
+        ERC20Mock(weth).approve(address(mockDsce), AMOUNT_COLLATERAL);
+
+            vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
+            mockDsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, amountToMint);
+            vm.stopPrank();
+        }
+
 
     function testRevertsIfMintAmountIsZero() public {
         vm.startPrank(user);
